@@ -1,8 +1,28 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from dependency_injector.wiring import Provide, inject
+from lib.app.container import Container
+from lib.app.application.services.auth_service import AuthService
+from lib.app.domain.dtos.auth_dto import UserResponse
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# ← Change from OAuth2PasswordBearer to HTTPBearer
+security = HTTPBearer()
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    # Will be implemented later
-    pass
+
+@inject
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    service:     AuthService = Depends(Provide[Container.auth_service])
+) -> UserResponse:
+    return await service.get_current_user(credentials.credentials)
+
+
+async def get_current_admin(
+    current_user: UserResponse = Depends(get_current_user)
+) -> UserResponse:
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user

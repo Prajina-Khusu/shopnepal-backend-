@@ -22,7 +22,7 @@ class Product(Base):
     category    = relationship("Category",     back_populates="products")
     images      = relationship("ProductImage", back_populates="product")
     order_items = relationship("OrderItem",    back_populates="product")
-    cart_items  = relationship("Cart",         back_populates="cart_items")
+    cart_items  = relationship("Cart",         back_populates="product")  # ← fixed
     reviews     = relationship("Review",       back_populates="product")
 
 
