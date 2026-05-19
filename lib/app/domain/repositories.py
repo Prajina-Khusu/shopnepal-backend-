@@ -156,3 +156,21 @@ class ReviewRepository(ABC):
         comment: str
     ) -> Any:
         pass
+
+
+from abc import ABC, abstractmethod
+from typing import Optional, Dict
+
+class AddressRepository(ABC):
+
+    @abstractmethod
+    def get_by_id(self, address_id: int) -> Optional[Dict]:
+        ...
+
+    @abstractmethod
+    def create(self, user_id: int, data: dict) -> Dict:
+        ...
+
+    @abstractmethod
+    def get_by_user(self, user_id: int):
+        ...

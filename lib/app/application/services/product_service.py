@@ -30,7 +30,7 @@ class ProductService(ProductServiceBase):
             category_id = request.category_id
         )
         return ProductListResponse(
-            items = [ProductResponse.model_validate(p) for p in items],
+            items = [ProductResponse(**p) for p in items],
             total = total,
             skip  = request.skip,
             limit = request.limit
@@ -43,10 +43,16 @@ class ProductService(ProductServiceBase):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Product not found"
             )
-        return ProductResponse.model_validate(product)
+        return ProductResponse(**product)
 
     async def create(self, request: CreateProductRequest) -> ProductResponse:
-        slug    = slugify(request.name)
+        slug = slugify(request.name)
+        
+        # Check if slug already exists → return existing product
+        existing = self.product_repository.get_by_slug(slug)
+        if existing:
+            return ProductResponse(**existing)
+        
         product = self.product_repository.create({
             "name":        request.name,
             "slug":        slug,
@@ -56,7 +62,7 @@ class ProductService(ProductServiceBase):
             "stock":       request.stock,
             "category_id": request.category_id,
         })
-        return ProductResponse.model_validate(product)
+        return ProductResponse(**product)
 
     async def update(
         self,
@@ -70,9 +76,9 @@ class ProductService(ProductServiceBase):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Product not found"
             )
-        return ProductResponse.model_validate(product)
+        return ProductResponse(**product)
 
-    async def delete(self, product_id: int) -> bool:
+    async def delete(self, product_id: int) -> bool:      # ← was missing
         result = self.product_repository.delete(product_id)
         if not result:
             raise HTTPException(

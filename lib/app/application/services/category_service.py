@@ -12,14 +12,12 @@ class CategoryService(CategoryServiceBase):
 
     async def get_all(self) -> List[CategoryResponse]:
         categories = self.category_repository.get_all()
-        return [CategoryResponse.model_validate(c) for c in categories]
+        return [CategoryResponse(**c) for c in categories]  # ← fix
 
     async def create(self, request: CreateCategoryRequest) -> CategoryResponse:
         existing = self.category_repository.get_by_slug(request.slug)
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Category slug already exists"
-            )
+            # Return existing instead of error
+            return CategoryResponse(**existing)
         category = self.category_repository.create(request.model_dump())
-        return CategoryResponse.model_validate(category)
+        return CategoryResponse(**category)

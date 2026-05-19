@@ -12,15 +12,15 @@ def init_routers(app_: FastAPI) -> None:
 
 def create_app() -> FastAPI:
 
-    # Create and wire container first
     container = Container()
 
     app_ = FastAPI(
-        title="ShopNepal API",
-        description="Backend API for ShopNepal Ecommerce",
-        version="1.0.0",
-        docs_url="/docs"     if config.RUN_APP_ENABLE_DOCS else None,
-        openapi_url="/openapi.json" if config.RUN_APP_ENABLE_DOCS else None,
+        title       = "ShopNepal API",
+        description = "Backend API for ShopNepal Ecommerce",
+        version     = "1.0.0",
+        docs_url    = "/api/v1/docs",        # ← changed
+        redoc_url   = "/api/v1/redoc",       # ← changed
+        openapi_url = "/api/v1/openapi.json" # ← changed
     )
 
     app_.container = container
@@ -49,6 +49,7 @@ async def health_check():
             "status": "ShopNepal API is running ✅",
             "env":    config.ENV,
             "debug":  config.DEBUG,
+            "docs":   "http://localhost:8000/api/v1/docs",
         },
         status_code=200,
     )

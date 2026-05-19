@@ -12,17 +12,10 @@ class ReviewService(ReviewServiceBase):
 
     async def get_reviews(self, product_id: int) -> List[ReviewResponse]:
         reviews = self.review_repository.get_by_product(product_id)
-        return [ReviewResponse.model_validate(r) for r in reviews]
+        return [ReviewResponse(**r) for r in reviews]  # ← fix
 
-    async def create(
-        self,
-        user_id: int,
-        product_id: int,
-        request: CreateReviewRequest
-    ) -> ReviewResponse:
-        existing = self.review_repository.get_by_user_and_product(
-            user_id, product_id
-        )
+    async def create(self, user_id, product_id, request) -> ReviewResponse:
+        existing = self.review_repository.get_by_user_and_product(user_id, product_id)
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -34,4 +27,4 @@ class ReviewService(ReviewServiceBase):
             rating     = request.rating,
             comment    = request.comment or ""
         )
-        return ReviewResponse.model_validate(review)
+        return ReviewResponse(**review)  # ← fix

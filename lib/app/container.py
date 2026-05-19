@@ -105,10 +105,18 @@ class Container(containers.DeclarativeContainer):
         product_repository=product_repository,  # ← needs product to check stock
     )
 
-    order_service = providers.Singleton(
+    # Add alongside your other repository providers:
+    address_repository = providers.Singleton(
+        AddressRepositoryImpl,
+        db_client=db_client,
+    )
+
+    # Update order_service to inject it:
+    order_service = providers.Factory(
         OrderService,
-        order_repository=order_repository,
-        cart_repository=cart_repository,         # ← needs cart to checkout
+        order_repository   = order_repository,
+        cart_repository    = cart_repository,
+        address_repository = address_repository,   # ← add this line
     )
 
     review_service = providers.Singleton(
