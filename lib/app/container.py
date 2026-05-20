@@ -23,6 +23,9 @@ from lib.app.application.services.review_service   import ReviewService
 from lib.app.adapter.output.persistence.address.repositories import AddressRepositoryImpl
 from lib.app.application.services.address_service import AddressService
 
+from lib.app.adapter.output.persistence.seller.repositories import SellerRepositoryImpl
+from lib.app.application.services.seller_service import SellerService
+
 
 class Container(containers.DeclarativeContainer):
 
@@ -36,6 +39,7 @@ class Container(containers.DeclarativeContainer):
             "lib.app.adapter.input.api.v1.reviews.reviews",
             "lib.app.adapter.input.api.v1.dependencies.auth",
             "lib.app.adapter.input.api.v1.addresses.addresses",
+            "lib.app.adapter.input.api.v1.seller.seller",
 
         ]
     )
@@ -131,4 +135,17 @@ class Container(containers.DeclarativeContainer):
     review_service = providers.Singleton(
         ReviewService,
         review_repository=review_repository,
+    )
+
+
+        # Add repositories
+    seller_repository = providers.Singleton(
+        SellerRepositoryImpl,
+        db_client=db_client,
+    )
+
+    # Add service
+    seller_service = providers.Singleton(
+        SellerService,
+        seller_repository=seller_repository,
     )

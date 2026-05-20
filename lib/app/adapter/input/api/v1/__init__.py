@@ -5,7 +5,8 @@ from lib.app.adapter.input.api.v1.categories.categories import router as categor
 from lib.app.adapter.input.api.v1.cart.cart             import router as cart_router
 from lib.app.adapter.input.api.v1.orders.orders         import router as orders_router
 from lib.app.adapter.input.api.v1.reviews.reviews       import router as reviews_router
-from lib.app.adapter.input.api.v1.addresses.addresses   import router as addresses_router  # ← add
+from lib.app.adapter.input.api.v1.addresses.addresses   import router as addresses_router  
+from lib.app.adapter.input.api.v1.seller.seller import router as seller_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -15,6 +16,7 @@ router.include_router(categories_router)
 router.include_router(cart_router)
 router.include_router(orders_router)
 router.include_router(reviews_router)
-router.include_router(addresses_router)  # ← add
+router.include_router(addresses_router) 
+router.include_router(seller_router)
 
 __all__ = ["router"]
