@@ -20,6 +20,9 @@ from lib.app.application.services.cart_service     import CartService
 from lib.app.application.services.order_service    import OrderService
 from lib.app.application.services.review_service   import ReviewService
 
+from lib.app.adapter.output.persistence.address.repositories import AddressRepositoryImpl
+from lib.app.application.services.address_service import AddressService
+
 
 class Container(containers.DeclarativeContainer):
 
@@ -32,6 +35,8 @@ class Container(containers.DeclarativeContainer):
             "lib.app.adapter.input.api.v1.orders.orders",
             "lib.app.adapter.input.api.v1.reviews.reviews",
             "lib.app.adapter.input.api.v1.dependencies.auth",
+            "lib.app.adapter.input.api.v1.addresses.addresses",
+
         ]
     )
 
@@ -104,11 +109,15 @@ class Container(containers.DeclarativeContainer):
         cart_repository=cart_repository,
         product_repository=product_repository,  # ← needs product to check stock
     )
-
+   
     # Add alongside your other repository providers:
     address_repository = providers.Singleton(
         AddressRepositoryImpl,
         db_client=db_client,
+    )
+    address_service = providers.Factory(
+        AddressService,
+        address_repository=address_repository,
     )
 
     # Update order_service to inject it:
