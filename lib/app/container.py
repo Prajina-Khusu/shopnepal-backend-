@@ -30,19 +30,19 @@ from lib.app.application.services.seller_service import SellerService
 class Container(containers.DeclarativeContainer):
 
     wiring_config = containers.WiringConfiguration(
-        modules=[
-            "lib.app.adapter.input.api.v1.auth.auth",
-            "lib.app.adapter.input.api.v1.products.products",
-            "lib.app.adapter.input.api.v1.categories.categories",
-            "lib.app.adapter.input.api.v1.cart.cart",
-            "lib.app.adapter.input.api.v1.orders.orders",
-            "lib.app.adapter.input.api.v1.reviews.reviews",
-            "lib.app.adapter.input.api.v1.dependencies.auth",
-            "lib.app.adapter.input.api.v1.addresses.addresses",
-            "lib.app.adapter.input.api.v1.seller.seller",
-
-        ]
-    )
+    modules=[
+        "lib.app.adapter.input.api.v1.auth.auth",
+        "lib.app.adapter.input.api.v1.products.products",
+        "lib.app.adapter.input.api.v1.categories.categories",
+        "lib.app.adapter.input.api.v1.cart.cart",
+        "lib.app.adapter.input.api.v1.orders.orders",
+        "lib.app.adapter.input.api.v1.reviews.reviews",
+        "lib.app.adapter.input.api.v1.addresses.addresses",
+        "lib.app.adapter.input.api.v1.seller.seller",
+        "lib.app.adapter.input.api.v1.seller.products",
+        "lib.app.adapter.input.api.v1.dependencies.auth",
+            ]
+        )
 
     # =========================================================================
     # INFRASTRUCTURE LAYER — core connections

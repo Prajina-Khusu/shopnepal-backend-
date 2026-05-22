@@ -7,21 +7,21 @@ class ProductResponse(BaseModel):
     id:          int
     name:        str
     slug:        str
-    description: Optional[str]
+    description: Optional[str]  = None
     price:       float
-    sale_price:  Optional[float]
+    sale_price:  Optional[float] = None
     stock:       int
     is_active:   bool
-    category_id: Optional[int]
+    category_id: Optional[int]  = None
+    seller_id:   Optional[int]  = None
     created_at:  datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class CreateProductRequest(BaseModel):
     name:        str
-    description: Optional[str] = None
+    description: Optional[str]  = None
     price:       float
     sale_price:  Optional[float] = None
     stock:       int             = 0
@@ -42,6 +42,7 @@ class ProductListRequest(BaseModel):
     limit:       int            = 20
     search:      Optional[str]  = None
     category_id: Optional[int]  = None
+    seller_id:   Optional[int]  = None
 
 
 class ProductListResponse(BaseModel):

@@ -26,37 +26,62 @@ class ProductRepositoryImpl(ProductRepository):
     def __init__(self, db_client: PostgreSQLClient):
         self.db_client = db_client
 
-    def get_all(self, skip, limit, search, category_id) -> List[Dict]:
-        with self.db_client.get_session() as db:
-            query = db.query(Product).filter(Product.is_active == True)
-            if search:
-                query = query.filter(
-                    or_(
-                        Product.name.ilike(f"%{search}%"),
-                        Product.description.ilike(f"%{search}%")
-                    )
+    def _base_query(self, db, search=None, category_id=None, seller_id=None):
+        query = db.query(Product).filter(Product.is_active == True)
+        if search:
+            query = query.filter(
+                or_(
+                    Product.name.ilike(f"%{search}%"),
+                    Product.description.ilike(f"%{search}%")
                 )
-            if category_id:
-                query = query.filter(Product.category_id == category_id)
+            )
+        if category_id:
+            query = query.filter(Product.category_id == category_id)
+        if seller_id:
+            query = query.filter(Product.seller_id == seller_id)
+        return query
+
+    def get_all(
+        self,
+        skip:        int           = 0,
+        limit:       int           = 20,
+        search:      Optional[str] = None,
+        category_id: Optional[int] = None,
+        seller_id:   Optional[int] = None,
+    ) -> List[Dict]:
+        with self.db_client.get_session() as db:
+            query = self._base_query(db, search, category_id, seller_id)
             return [_to_dict(p) for p in query.offset(skip).limit(limit).all()]
 
-    def count(self, search, category_id) -> int:
+    def count(
+        self,
+        search:      Optional[str] = None,
+        category_id: Optional[int] = None,
+        seller_id:   Optional[int] = None,
+    ) -> int:
         with self.db_client.get_session() as db:
-            query = db.query(Product).filter(Product.is_active == True)
-            if search:
-                query = query.filter(
-                    or_(
-                        Product.name.ilike(f"%{search}%"),
-                        Product.description.ilike(f"%{search}%")
-                    )
-                )
-            if category_id:
-                query = query.filter(Product.category_id == category_id)
-            return query.count()
+            return self._base_query(db, search, category_id, seller_id).count()
+
+    def get_by_slug_and_seller(
+        self,
+        slug:      str,
+        seller_id: Optional[int],
+    ) -> Optional[Dict]:
+        """Check duplicate: same slug + same seller = duplicate. Different seller = allowed."""
+        with self.db_client.get_session() as db:
+            p = db.query(Product).filter(
+                Product.slug      == slug,
+                Product.seller_id == seller_id   # None == None for admin products
+            ).first()
+            return _to_dict(p) if p else None
 
     def get_by_slug(self, slug: str) -> Optional[Dict]:
+        """Used for public product lookup by slug (returns first match)."""
         with self.db_client.get_session() as db:
-            p = db.query(Product).filter(Product.slug == slug).first()
+            p = db.query(Product).filter(
+                Product.slug      == slug,
+                Product.is_active == True
+            ).first()
             return _to_dict(p) if p else None
 
     def get_by_id(self, product_id: int) -> Optional[Dict]:

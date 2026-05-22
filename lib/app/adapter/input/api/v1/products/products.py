@@ -8,9 +8,7 @@ from lib.app.domain.dtos.product_dto import (
     CreateProductRequest, UpdateProductRequest,
     ProductListRequest
 )
-from lib.app.adapter.input.api.v1.dependencies.auth import (
-    get_current_user, get_current_admin
-)
+from lib.app.adapter.input.api.v1.dependencies.auth import get_current_admin
 from lib.app.domain.dtos.auth_dto import UserResponse
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -19,15 +17,18 @@ router = APIRouter(prefix="/products", tags=["Products"])
 @router.get("/", response_model=ProductListResponse)
 @inject
 async def get_products(
-    skip:        int           = Query(0,    ge=0),
-    limit:       int           = Query(20,   ge=1, le=100),
-    search:      Optional[str] = Query(None),
-    category_id: Optional[int] = Query(None),
+    skip:        int            = Query(0,   ge=0),
+    limit:       int            = Query(20,  ge=1, le=100),
+    search:      Optional[str]  = Query(None),
+    category_id: Optional[int]  = Query(None),
     service:     ProductService = Depends(Provide[Container.product_service])
 ):
     return await service.get_all(ProductListRequest(
-        skip=skip, limit=limit,
-        search=search, category_id=category_id
+        skip        = skip,
+        limit       = limit,
+        search      = search,
+        category_id = category_id,
+        seller_id   = None,          # public listing shows all products
     ))
 
 
@@ -47,7 +48,7 @@ async def create_product(
     service:      ProductService = Depends(Provide[Container.product_service]),
     current_user: UserResponse   = Depends(get_current_admin)
 ):
-    return await service.create(request)
+    return await service.create(request, seller_id=None)
 
 
 @router.put("/{product_id}", response_model=ProductResponse)
@@ -58,7 +59,7 @@ async def update_product(
     service:      ProductService = Depends(Provide[Container.product_service]),
     current_user: UserResponse   = Depends(get_current_admin)
 ):
-    return await service.update(product_id, request)
+    return await service.update(product_id, request, seller_id=None)
 
 
 @router.delete("/{product_id}")
@@ -68,5 +69,5 @@ async def delete_product(
     service:      ProductService = Depends(Provide[Container.product_service]),
     current_user: UserResponse   = Depends(get_current_admin)
 ):
-    await service.delete(product_id)
+    await service.delete(product_id, seller_id=None)
     return {"message": "Product deleted successfully"}

@@ -32,12 +32,12 @@ class SellerRepositoryImpl:
             ).first()
             return _to_dict(s) if s else None
 
-    def get_all(self, status: Optional[str] = None) -> List[Dict]:
+    def get_by_shop_name(self, shop_name: str) -> Optional[Dict]:   # ← ADD
         with self.db_client.get_session() as db:
-            query = db.query(SellerApplication)
-            if status:
-                query = query.filter(SellerApplication.status == status)
-            return [_to_dict(s) for s in query.all()]
+            s = db.query(SellerApplication).filter(
+                SellerApplication.shop_name == shop_name
+            ).first()
+            return _to_dict(s) if s else None
 
     def get_by_id(self, application_id: int) -> Optional[Dict]:
         with self.db_client.get_session() as db:
@@ -45,6 +45,13 @@ class SellerRepositoryImpl:
                 SellerApplication.id == application_id
             ).first()
             return _to_dict(s) if s else None
+
+    def get_all(self, status: Optional[str] = None) -> List[Dict]:
+        with self.db_client.get_session() as db:
+            query = db.query(SellerApplication)
+            if status:
+                query = query.filter(SellerApplication.status == status)
+            return [_to_dict(s) for s in query.all()]
 
     def create(self, user_id: int, data: Dict[str, Any]) -> Dict:
         with self.db_client.get_session() as db:

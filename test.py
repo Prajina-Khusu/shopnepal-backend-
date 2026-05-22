@@ -1,5 +1,6 @@
 import requests
 import random
+import re
 
 BASE    = "http://localhost:8000/api/v1"
 headers = {}
@@ -37,40 +38,73 @@ def login(email, password, label=""):
             print(f"  Switched to {label} token ✅")
         return token
     else:
-        print(f"  ❌ Login failed for {email} → {resp.status_code}")
+        print(f"  ❌ Login failed for {email} → {resp.status_code}: {resp.text[:100]}")
         return None
+
+def slugify(text):
+    text = text.lower().strip()
+    return re.sub(r"[\s_]+", "-", re.sub(r"[^\w\s-]", "", text))
+
+# ══════════════════════════════════════════════════════
+# TRACK ALL IDS
+# ══════════════════════════════════════════════════════
+customer_email    = f"customer{random.randint(1000,9999)}@gmail.com"
+customer_password = "test1234"
+seller_email      = f"seller{random.randint(1000,9999)}@gmail.com"
+seller_password   = "seller1234"
+
+cat_ids        = {}
+product_ids    = []
+product_slugs  = []
+address_id     = None
+order_id       = None
+application_id = None
 
 # ══════════════════════════════════════════════════════
 # 1. AUTH
 # ══════════════════════════════════════════════════════
 section("1. AUTH")
 
-email    = f"customer{random.randint(1000,9999)}@gmail.com"
-password = "test1234"
-print(f"  Using customer email: {email}")
+print(f"  Customer email: {customer_email}")
+print(f"  Seller email:   {seller_email}")
 
-test("Register Customer", "POST", f"{BASE}/auth/register", {
+# Register customer
+resp = test("Register Customer", "POST", f"{BASE}/auth/register", {
     "name":     "Test Customer",
-    "email":    email,
-    "password": password,
+    "email":    customer_email,
+    "password": customer_password,
     "phone":    "9800000001"
 }, expected=201)
+if resp:
+    print(f"  Customer ID: {resp.get('id')}")
 
+# Register seller applicant
+resp = test("Register Seller Account", "POST", f"{BASE}/auth/register", {
+    "name":     "Test Seller",
+    "email":    seller_email,
+    "password": seller_password,
+    "phone":    "9800000002"
+}, expected=201)
+if resp:
+    print(f"  Seller Account ID: {resp.get('id')}")
+
+# Admin login
 login(ADMIN_EMAIL, ADMIN_PASSWORD, label="admin")
 resp = test("Get Me (Admin)", "GET", f"{BASE}/auth/me")
 if resp:
-    print(f"  Logged in as: {resp.get('name')} | role: {resp.get('role')}")
+    print(f"  Admin: {resp.get('name')} | role: {resp.get('role')}")
 
 # ══════════════════════════════════════════════════════
-# 2. CATEGORIES (admin)
+# 2. CATEGORIES (Admin only)
 # ══════════════════════════════════════════════════════
 section("2. CATEGORIES")
 
+# Get existing
 resp = requests.get(f"{BASE}/categories/", headers=headers)
-existing_cats  = resp.json() if resp.status_code == 200 else []
-existing_slugs = [c["slug"] for c in existing_cats]
-cat_ids        = {c["name"]: c["id"] for c in existing_cats}
-print(f"  Existing categories: {len(existing_cats)}")
+existing = resp.json() if resp.status_code == 200 else []
+existing_slugs = [c["slug"] for c in existing]
+cat_ids = {c["name"]: c["id"] for c in existing}
+print(f"  Existing: {len(existing)} categories")
 
 categories = [
     {"name": "Electronics", "slug": "electronics", "image_url": "https://example.com/electronics.jpg"},
@@ -90,109 +124,114 @@ for cat in categories:
 
 resp = test("Get All Categories", "GET", f"{BASE}/categories/")
 if resp:
-    print(f"  Total categories: {len(resp)}")
+    print(f"  Total: {len(resp)}")
     for c in resp:
         cat_ids[c["name"]] = c["id"]
         print(f"    - [{c['id']}] {c['name']}")
 
 # ══════════════════════════════════════════════════════
-# 3. PRODUCTS (admin)
+# 3. ADMIN ADDS PRODUCTS
 # ══════════════════════════════════════════════════════
-section("3. PRODUCTS")
-
-resp = requests.get(f"{BASE}/products/", headers=headers)
-existing_prods  = resp.json() if resp.status_code == 200 else {}
-existing_slugs  = [p["slug"] for p in existing_prods.get("items", [])]
-product_ids     = [p["id"]   for p in existing_prods.get("items", [])]
-product_slugs   = [p["slug"] for p in existing_prods.get("items", [])]
-print(f"  Existing products: {existing_prods.get('total', 0)}")
-
-import re
-def slugify(text):
-    text = text.lower().strip()
-    return re.sub(r"[\s_]+", "-", re.sub(r"[^\w\s-]", "", text))
+section("3. ADMIN PRODUCTS")
 
 electronics_id = cat_ids.get("Electronics", 1)
 fashion_id     = cat_ids.get("Fashion",     2)
 sports_id      = cat_ids.get("Sports",      5)
 
-products = [
-    {"name": "Samsung Galaxy A15",    "description": "5G Smartphone 128GB",          "price": 28500, "sale_price": 25000, "stock": 50,  "category_id": electronics_id},
-    {"name": "Apple AirPods Pro",     "description": "Active noise cancellation",     "price": 35000, "sale_price": 32000, "stock": 30,  "category_id": electronics_id},
-    {"name": "Nike Air Max 270",      "description": "Lightweight running shoes",     "price": 8500,  "sale_price": 7000,  "stock": 40,  "category_id": fashion_id},
-    {"name": "Adidas Track Pants",    "description": "Comfortable sports track pants","price": 3500,  "sale_price": 2800,  "stock": 60,  "category_id": sports_id},
-    {"name": "Wireless Mouse Logitech","description": "Ergonomic wireless mouse",     "price": 2500,  "sale_price": None,  "stock": 100, "category_id": electronics_id},
+# Get existing products
+resp = requests.get(f"{BASE}/products/", headers=headers)
+existing_prods = resp.json() if resp.status_code == 200 else {}
+existing_slugs = [p["slug"] for p in existing_prods.get("items", [])]
+product_ids    = [p["id"]   for p in existing_prods.get("items", [])]
+product_slugs  = [p["slug"] for p in existing_prods.get("items", [])]
+print(f"  Existing: {existing_prods.get('total', 0)} products")
+
+admin_products = [
+    {
+        "name":        "Samsung Galaxy A15",
+        "description": "5G Smartphone with 128GB storage and 50MP camera",
+        "price":       28500,
+        "sale_price":  25000,
+        "stock":       50,
+        "category_id": electronics_id
+    },
+    {
+        "name":        "Apple AirPods Pro",
+        "description": "Active noise cancellation wireless earbuds",
+        "price":       35000,
+        "sale_price":  32000,
+        "stock":       30,
+        "category_id": electronics_id
+    },
+    {
+        "name":        "Nike Air Max 270",
+        "description": "Lightweight running shoes for all terrain",
+        "price":       8500,
+        "sale_price":  7000,
+        "stock":       40,
+        "category_id": fashion_id
+    },
 ]
 
-for product in products:
+for product in admin_products:
     slug = slugify(product["name"])
     if slug in existing_slugs:
         print(f"  ⚠️  {product['name']} already exists — skipping")
     else:
-        resp = test(f"Create {product['name']}", "POST", f"{BASE}/products/", product, expected=201)
+        resp = test(
+            f"Admin creates: {product['name']}",
+            "POST", f"{BASE}/products/", product, expected=201
+        )
         if resp and "id" in resp:
             product_ids.append(resp["id"])
             product_slugs.append(resp["slug"])
-            print(f"    slug: {resp['slug']}")
+            print(f"    seller_id: {resp.get('seller_id')} (None = platform product)")
 
-resp = test("Get All Products",       "GET", f"{BASE}/products/")
+resp = test("Get All Products", "GET", f"{BASE}/products/")
 if resp:
     print(f"  Total products: {resp.get('total', 0)}")
 
-resp = test("Search (samsung)",       "GET", f"{BASE}/products/?search=samsung")
+resp = test("Search Products (samsung)", "GET", f"{BASE}/products/?search=samsung")
 if resp:
     print(f"  Search results: {resp.get('total', 0)}")
 
-resp = test("Filter by Electronics",  "GET", f"{BASE}/products/?category_id={electronics_id}")
+resp = test("Filter by Electronics", "GET",
+    f"{BASE}/products/?category_id={electronics_id}")
 if resp:
     print(f"  Electronics products: {resp.get('total', 0)}")
 
 if product_slugs:
-    resp = test("Get Product by Slug","GET", f"{BASE}/products/{product_slugs[0]}")
+    resp = test("Get Product by Slug", "GET",
+        f"{BASE}/products/{product_slugs[0]}")
     if resp:
-        print(f"  Found: {resp.get('name')} | Price: Rs.{resp.get('price')}")
+        print(f"  Found: {resp.get('name')} | Rs.{resp.get('price')}")
 
 # ══════════════════════════════════════════════════════
 # 4. SELLER APPLICATION FLOW
 # ══════════════════════════════════════════════════════
 section("4. SELLER APPLICATION")
 
-seller_email    = f"seller{random.randint(1000,9999)}@gmail.com"
-seller_password = "seller1234"
-print(f"  Using seller email: {seller_email}")
-
-# Register seller as customer first
-test("Register Seller Account", "POST", f"{BASE}/auth/register", {
-    "name":     "Test Seller",
-    "email":    seller_email,
-    "password": seller_password,
-    "phone":    "9800000002"
-}, expected=201)
-
-# Login as seller
+# Seller applies
 login(seller_email, seller_password, label="seller applicant")
 
-# Apply to become seller
-application_id = None
 resp = test("Apply as Seller", "POST", f"{BASE}/seller/apply", {
     "shop_name":    "Test Electronics Shop",
     "shop_address": "New Road, Kathmandu",
     "phone":        "9800000002",
-    "description":  "Selling quality electronics products"
+    "description":  "Selling quality electronics"
 }, expected=201)
 if resp and "id" in resp:
     application_id = resp["id"]
     print(f"  Application ID: {application_id} | Status: {resp.get('status')}")
 
-# Check application status
-resp = test("Check My Application", "GET", f"{BASE}/seller/my-application")
+resp = test("Check My Application Status", "GET", f"{BASE}/seller/my-application")
 if resp:
-    print(f"  Application status: {resp.get('status')}")
+    print(f"  Status: {resp.get('status')} | Shop: {resp.get('shop_name')}")
 
-# Admin reviews application
+# Admin reviews
 login(ADMIN_EMAIL, ADMIN_PASSWORD, label="admin")
 
-resp = test("Get All Pending Applications", "GET",
+resp = test("Get Pending Applications", "GET",
     f"{BASE}/seller/applications?status=pending")
 if resp:
     print(f"  Pending applications: {len(resp)}")
@@ -208,23 +247,94 @@ if application_id:
     if resp:
         print(f"  Application status: {resp.get('status')}")
 
-# Seller logs in again — now has seller role
+# Verify seller role changed
 login(seller_email, seller_password, label="seller")
-resp = test("Get Me (Seller)", "GET", f"{BASE}/auth/me")
+resp = test("Get Me (should be seller now)", "GET", f"{BASE}/auth/me")
 if resp:
-    print(f"  Role after approval: {resp.get('role')}")
+    print(f"  Role: {resp.get('role')} ← should be 'seller'")
 
 # ══════════════════════════════════════════════════════
-# 5. CART (customer)
+# 5. SELLER ADDS PRODUCTS
 # ══════════════════════════════════════════════════════
-section("5. CART")
+section("5. SELLER PRODUCTS")
 
-login(email, password, label="customer")
+seller_products = [
+    {
+        "name":        "Logitech Wireless Keyboard",
+        "description": "Ergonomic wireless keyboard with long battery life",
+        "price":       2500,
+        "sale_price":  None,
+        "stock":       100,
+        "category_id": electronics_id
+    },
+    {
+        "name":        "Adidas Track Pants",
+        "description": "Comfortable sports track pants",
+        "price":       3500,
+        "sale_price":  2800,
+        "stock":       60,
+        "category_id": sports_id
+    },
+    {
+        "name":        "Sony WH-1000XM5",
+        "description": "Premium noise cancelling headphones",
+        "price":       45000,
+        "sale_price":  42000,
+        "stock":       15,
+        "category_id": electronics_id
+    },
+]
+
+seller_product_ids = []
+
+for product in seller_products:
+    slug = slugify(product["name"])
+    if slug in existing_slugs:
+        print(f"  ⚠️  {product['name']} already exists — skipping")
+    else:
+        resp = test(
+            f"Seller creates: {product['name']}",
+            "POST", f"{BASE}/seller/products/", product, expected=201
+        )
+        if resp and "id" in resp:
+            seller_product_ids.append(resp["id"])
+            product_ids.append(resp["id"])
+            product_slugs.append(resp["slug"])
+            print(f"    seller_id: {resp.get('seller_id')} ← seller's id")
+
+# Seller views only their products
+resp = test("Seller Gets Own Products", "GET", f"{BASE}/seller/products/")
+if resp:
+    print(f"  My products: {resp.get('total', 0)}")
+    for p in resp.get("items", []):
+        print(f"    - [{p['id']}] {p['name']} | seller_id: {p.get('seller_id')}")
+
+# Seller updates their product
+if seller_product_ids:
+    resp = test("Seller Updates Own Product", "PUT",
+        f"{BASE}/seller/products/{seller_product_ids[0]}", {
+            "price": 2300,
+            "stock": 90
+        })
+    if resp:
+        print(f"  Updated price: Rs.{resp.get('price')} | stock: {resp.get('stock')}")
+
+# All products visible to everyone
+resp = test("All Products (public)", "GET", f"{BASE}/products/")
+if resp:
+    print(f"  Total products (admin + seller): {resp.get('total', 0)}")
+
+# ══════════════════════════════════════════════════════
+# 6. CART (customer)
+# ══════════════════════════════════════════════════════
+section("6. CART")
+
+login(customer_email, customer_password, label="customer")
 
 cart_items = []
 
 if product_ids:
-    resp = test("Add Product 1 to Cart", "POST", f"{BASE}/cart/", {
+    resp = test("Add Admin Product to Cart", "POST", f"{BASE}/cart/", {
         "product_id": product_ids[0],
         "quantity":   2
     }, expected=201)
@@ -232,7 +342,7 @@ if product_ids:
         print(f"  Cart items: {len(resp.get('items',[]))} | Total: Rs.{resp.get('total',0)}")
 
     if len(product_ids) > 1:
-        resp = test("Add Product 2 to Cart", "POST", f"{BASE}/cart/", {
+        resp = test("Add Seller Product to Cart", "POST", f"{BASE}/cart/", {
             "product_id": product_ids[1],
             "quantity":   1
         }, expected=201)
@@ -251,14 +361,28 @@ if cart_items:
     if resp:
         print(f"  Updated total: Rs.{resp.get('total', 0)}")
 
-# ══════════════════════════════════════════════════════
-# 6. ADDRESSES (customer)
-# ══════════════════════════════════════════════════════
-section("6. ADDRESSES")
+    resp = test("Remove Cart Item", "DELETE",
+        f"{BASE}/cart/{cart_items[0]['id']}")
+    if resp:
+        print(f"  Item removed ✅")
 
-address_id = None
+resp = test("Get Cart After Remove", "GET", f"{BASE}/cart/")
+if resp:
+    print(f"  Cart items after remove: {len(resp.get('items', []))}")
 
-resp = test("Create Address", "POST", f"{BASE}/addresses/", {
+# Re-add item for checkout
+if product_ids:
+    test("Re-add Item for Checkout", "POST", f"{BASE}/cart/", {
+        "product_id": product_ids[0],
+        "quantity":   1
+    }, expected=201)
+
+# ══════════════════════════════════════════════════════
+# 7. ADDRESSES (customer)
+# ══════════════════════════════════════════════════════
+section("7. ADDRESSES")
+
+resp = test("Create Primary Address", "POST", f"{BASE}/addresses/", {
     "full_name":  "Test Customer",
     "phone":      "9800000001",
     "street":     "Thamel Marg 12",
@@ -268,23 +392,35 @@ resp = test("Create Address", "POST", f"{BASE}/addresses/", {
 }, expected=201)
 if resp and "id" in resp:
     address_id = resp["id"]
-    print(f"  Address ID: {address_id} | {resp.get('street')}, {resp.get('city')}")
+    print(f"  Address ID: {address_id} | {resp.get('city')}")
 
-resp = test("Get My Addresses", "GET", f"{BASE}/addresses/")
+resp = test("Create Second Address", "POST", f"{BASE}/addresses/", {
+    "full_name":  "Test Customer",
+    "phone":      "9800000001",
+    "street":     "Lazimpat Road 5",
+    "city":       "Kathmandu",
+    "province":   "Bagmati",
+    "is_default": False
+}, expected=201)
+
+resp = test("Get All My Addresses", "GET", f"{BASE}/addresses/")
 if resp:
     print(f"  Total addresses: {len(resp)}")
     for a in resp:
-        print(f"    - [{a['id']}] {a['full_name']} | {a['street']}, {a['city']} {'⭐' if a.get('is_default') else ''}")
+        print(f"    - [{a['id']}] {a['street']}, {a['city']} {'⭐' if a.get('is_default') else ''}")
+
+if address_id:
+    resp = test("Get Address by ID", "GET", f"{BASE}/addresses/{address_id}")
+    if resp:
+        print(f"  Address: {resp.get('street')}, {resp.get('city')}")
 
 # ══════════════════════════════════════════════════════
-# 7. ORDERS (customer → admin)
+# 8. ORDERS (customer → admin)
 # ══════════════════════════════════════════════════════
-section("7. ORDERS")
-
-order_id = None
+section("8. ORDERS")
 
 if not address_id:
-    print("  ⚠️  Skipping checkout — address creation failed")
+    print("  ⚠️  Skipping checkout — no address")
 else:
     resp = test("Checkout", "POST", f"{BASE}/orders/checkout", {
         "address_id": address_id
@@ -295,51 +431,57 @@ else:
         print(f"  Status:      {resp.get('status')}")
         print(f"  Total:       Rs.{resp.get('total_amount')}")
         print(f"  Items:       {len(resp.get('items', []))}")
+        for item in resp.get("items", []):
+            print(f"    - Product {item['product_id']} x{item['quantity']} @ Rs.{item['price']}")
 
 resp = test("Get My Orders", "GET", f"{BASE}/orders/")
 if resp:
     print(f"  Total orders: {len(resp)}")
-    if not order_id and len(resp) > 0:
+    if not order_id and resp:
         order_id = resp[0]["id"]
 
 if order_id:
     resp = test("Get Order Detail", "GET", f"{BASE}/orders/{order_id}")
     if resp:
-        print(f"  Order {order_id} status: {resp.get('status')}")
+        print(f"  Order {order_id} | status: {resp.get('status')}")
 
+# Admin updates order status
 login(ADMIN_EMAIL, ADMIN_PASSWORD, label="admin")
 
 if order_id:
     for status in ["processing", "shipped", "delivered"]:
-        resp = test(f"Update Status → {status.capitalize()}", "PATCH",
-            f"{BASE}/orders/{order_id}/status", {"status": status})
+        resp = test(
+            f"Update Status → {status.capitalize()}",
+            "PATCH", f"{BASE}/orders/{order_id}/status",
+            {"status": status}
+        )
         if resp:
-            print(f"  New status: {resp.get('status')}")
+            print(f"  Status: {resp.get('status')}")
 
 # ══════════════════════════════════════════════════════
-# 8. REVIEWS (customer)
+# 9. REVIEWS (customer)
 # ══════════════════════════════════════════════════════
-section("8. REVIEWS")
+section("9. REVIEWS")
 
-login(email, password, label="customer")
+login(customer_email, customer_password, label="customer")
 
 if product_ids:
-    resp = test("Add Review to Product 1", "POST",
+    resp = test("Review Admin Product", "POST",
         f"{BASE}/reviews/{product_ids[0]}", {
             "rating":  5,
-            "comment": "Excellent product! Very satisfied."
+            "comment": "Excellent product! Very satisfied with the purchase."
         }, expected=201)
     if resp:
-        print(f"  Review: ★{resp.get('rating')} - {resp.get('comment')}")
+        print(f"  ★{resp.get('rating')} - {resp.get('comment')}")
 
     if len(product_ids) > 1:
-        resp = test("Add Review to Product 2", "POST",
+        resp = test("Review Seller Product", "POST",
             f"{BASE}/reviews/{product_ids[1]}", {
                 "rating":  4,
-                "comment": "Good quality but slightly expensive."
+                "comment": "Good quality seller. Fast delivery!"
             }, expected=201)
         if resp:
-            print(f"  Review: ★{resp.get('rating')} - {resp.get('comment')}")
+            print(f"  ★{resp.get('rating')} - {resp.get('comment')}")
 
     resp = test("Get Reviews for Product 1", "GET",
         f"{BASE}/reviews/{product_ids[0]}")
@@ -349,9 +491,39 @@ if product_ids:
             print(f"    ★{r['rating']} - {r['comment']}")
 
 # ══════════════════════════════════════════════════════
-# 9. FINAL SUMMARY
+# 10. ADMIN MANAGEMENT
 # ══════════════════════════════════════════════════════
-section("9. FINAL SUMMARY")
+section("10. ADMIN MANAGEMENT")
+
+login(ADMIN_EMAIL, ADMIN_PASSWORD, label="admin")
+
+# Admin updates a product
+if product_ids:
+    resp = test("Admin Updates Product", "PUT",
+        f"{BASE}/products/{product_ids[0]}", {
+            "price":     27000,
+            "sale_price": 24000,
+            "stock":     45
+        })
+    if resp:
+        print(f"  Updated: {resp.get('name')} | Rs.{resp.get('price')}")
+
+# Admin views all seller applications
+resp = test("All Seller Applications", "GET", f"{BASE}/seller/applications")
+if resp:
+    print(f"  Total applications: {len(resp)}")
+    for a in resp:
+        print(f"    - [{a['id']}] {a['shop_name']} | {a['status']}")
+
+# Admin views all orders
+resp = test("All Categories", "GET", f"{BASE}/categories/")
+if resp:
+    print(f"  Total categories: {len(resp)}")
+
+# ══════════════════════════════════════════════════════
+# 11. FINAL SUMMARY
+# ══════════════════════════════════════════════════════
+section("11. FINAL SUMMARY")
 
 login(ADMIN_EMAIL, ADMIN_PASSWORD)
 
@@ -359,29 +531,35 @@ cats  = requests.get(f"{BASE}/categories/", headers=headers).json()
 prods = requests.get(f"{BASE}/products/",   headers=headers).json()
 apps  = requests.get(f"{BASE}/seller/applications", headers=headers).json()
 
-total_cats  = len(cats)              if isinstance(cats,  list) else 0
-total_prods = prods.get("total", 0)  if isinstance(prods, dict) else 0
-total_apps  = len(apps)              if isinstance(apps,  list) else 0
+total_cats  = len(cats)             if isinstance(cats,  list) else 0
+total_prods = prods.get("total", 0) if isinstance(prods, dict) else 0
+total_apps  = len(apps)             if isinstance(apps,  list) else 0
 
 print(f"""
   Database Summary:
-  ├── Categories:         {total_cats}
-  ├── Products:           {total_prods}
-  ├── Seller Applications:{total_apps}
-  ├── Addresses:          {"✅" if address_id else "❌"}
-  ├── Cart:               tested ✅
-  ├── Orders:             {"✅" if order_id else "⚠️  skipped"}
-  └── Reviews:            tested ✅
+  ├── Categories:          {total_cats}
+  ├── Products (total):    {total_prods}
+  ├── Seller Applications: {total_apps}
+  ├── Addresses:           {"✅" if address_id     else "❌"}
+  ├── Orders:              {"✅" if order_id        else "⚠️  skipped"}
+  └── Reviews:             tested ✅
 
-  API Summary:
-  ├── Auth:               ✅ register, login, me
-  ├── Categories:         ✅ create, list
-  ├── Products:           ✅ create, list, search, filter, slug
-  ├── Seller Application: ✅ apply, check status, approve
-  ├── Cart:               ✅ add, get, update qty
-  ├── Addresses:          ✅ create, list
-  ├── Orders:             ✅ checkout, list, detail, update status
-  └── Reviews:            ✅ add, list
+  User Flows Tested:
+  ├── Customer:  register → browse → cart → checkout → review ✅
+  ├── Seller:    register → apply → approved → add products ✅
+  └── Admin:     login → manage categories → manage products → approve sellers ✅
+
+  API Endpoints Tested:
+  ├── Auth:              ✅ register, login, me
+  ├── Categories:        ✅ create (admin), list
+  ├── Admin Products:    ✅ create, list, search, filter, update
+  ├── Seller Apply:      ✅ apply, check status, approve
+  ├── Seller Products:   ✅ create own, list own, update own
+  ├── Public Products:   ✅ list all (admin + seller combined)
+  ├── Cart:              ✅ add, get, update, remove
+  ├── Addresses:         ✅ create, list, get by id
+  ├── Orders:            ✅ checkout, list, detail, update status
+  └── Reviews:           ✅ add, list
 """)
 
 print("═" * 50)

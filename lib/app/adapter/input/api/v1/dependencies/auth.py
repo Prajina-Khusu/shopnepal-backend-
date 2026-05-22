@@ -5,7 +5,6 @@ from lib.app.container import Container
 from lib.app.application.services.auth_service import AuthService
 from lib.app.domain.dtos.auth_dto import UserResponse
 
-# ← Change from OAuth2PasswordBearer to HTTPBearer
 security = HTTPBearer()
 
 
@@ -24,5 +23,16 @@ async def get_current_admin(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
+        )
+    return current_user
+
+
+async def get_current_seller(
+    current_user: UserResponse = Depends(get_current_user)
+) -> UserResponse:
+    if current_user.role not in ["seller", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seller access required"
         )
     return current_user

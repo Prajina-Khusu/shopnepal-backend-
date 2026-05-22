@@ -18,13 +18,22 @@ class SellerService:
         user_id: int,
         request: SellerApplicationRequest
     ) -> SellerApplicationResponse:
-        # Check if already applied
-        existing = self.seller_repository.get_by_user(user_id)
-        if existing:
+        # Check if this user already applied
+        existing_user = self.seller_repository.get_by_user(user_id)
+        if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"You already have an application with status: {existing['status']}"
+                detail=f"You already have an application with status: {existing_user['status']}"
             )
+
+        # Check if shop name is taken by anyone
+        existing_shop = self.seller_repository.get_by_shop_name(request.shop_name)
+        if existing_shop:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Shop name '{request.shop_name}' is already taken"
+            )
+
         application = self.seller_repository.create(user_id, {
             "shop_name":    request.shop_name,
             "shop_address": request.shop_address,
@@ -70,7 +79,6 @@ class SellerService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Application not found"
             )
-        # If approved → promote user to seller
         if request.status == "approved":
             self.seller_repository.update_user_role(
                 application["user_id"], "seller"
